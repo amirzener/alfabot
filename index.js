@@ -5,8 +5,8 @@ const axios = require('axios');
 const app = express();
 app.use(bodyParser.json());
 
-// توکن ربات
-const TOKEN = 'توکن_ربات_شما';
+// توکن ربات4
+const TOKEN = '7953285191:AAGWGtE_pIRNaY-NYjAygsiYV0tzvYCCcQw';
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 
 app.post('/', async (req, res) => {
