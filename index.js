@@ -7,13 +7,13 @@ const app = express();
 app.use(bodyParser.json());
 
 const TOKEN = '7953285191:AAGWGtE_pIRNaY-NYjAygsiYV0tzvYCCcQw';
-const CHANNEL_ID = '@jurabot1'; // با @ شروع شود
+const CHANNEL_ID = '@jurabot1';
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 
 app.post('/', async (req, res) => {
     const body = req.body;
 
-    // 1️⃣ مدیریت پیام لیست
+    // ذخیره پیام ارسالی در کانال برای ویرایش
     if (body.message && body.message.text === 'لیست') {
         const keyboard = {
             inline_keyboard: [
@@ -21,14 +21,21 @@ app.post('/', async (req, res) => {
             ]
         };
 
-        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+        const sentMessage = await axios.post(`${TELEGRAM_API}/sendMessage`, {
             chat_id: CHANNEL_ID,
-            text: 'برای ثبت حضور خود روی دکمه زیر بزنید 👇',
+            text: 'برای ثبت حضور روی دکمه زیر بزنید 👇',
             reply_markup: keyboard
         });
+
+        // ذخیره chat_id و message_id پیام کانال
+        const msgInfo = {
+            chat_id: sentMessage.data.result.chat.id,
+            message_id: sentMessage.data.result.message_id
+        };
+        fs.writeFileSync('message.json', JSON.stringify(msgInfo, null, 2));
     }
 
-    // 2️⃣ مدیریت دکمه شیشه‌ای
+    // مدیریت کلیک دکمه
     if (body.callback_query) {
         const callback = body.callback_query;
         const user = callback.from;
@@ -39,7 +46,9 @@ app.post('/', async (req, res) => {
             userList = JSON.parse(fs.readFileSync('list.json'));
         }
 
-        // چک اگر قبلا ثبت نشده باشد
+        let messageText = '';
+
+        // اگر کاربر قبلاً ثبت نشده
         if (!userList.find(u => u.id === user.id)) {
             userList.push({
                 id: user.id,
@@ -49,6 +58,31 @@ app.post('/', async (req, res) => {
             });
 
             fs.writeFileSync('list.json', JSON.stringify(userList, null, 2));
+
+            // ایجاد متن شماره‌گذاری شده
+            messageText = '✅ **لیست افراد ثبت شده:**\n\n';
+            userList.forEach((u, index) => {
+                const name = u.username ? `@${u.username}` : `${u.first_name} ${u.last_name}`;
+                messageText += `${index + 1}- ${name}\n`;
+            });
+
+            // خواندن chat_id و message_id برای ویرایش پیام
+            if (fs.existsSync('message.json')) {
+                const msgInfo = JSON.parse(fs.readFileSync('message.json'));
+                const keyboard = {
+                    inline_keyboard: [
+                        [{ text: 'هستم ✅', callback_data: 'register_me' }]
+                    ]
+                };
+
+                await axios.post(`${TELEGRAM_API}/editMessageText`, {
+                    chat_id: msgInfo.chat_id,
+                    message_id: msgInfo.message_id,
+                    text: messageText,
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard
+                });
+            }
 
             // پاسخ به کاربر
             await axios.post(`${TELEGRAM_API}/answerCallbackQuery`, {
