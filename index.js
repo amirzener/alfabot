@@ -1,4 +1,4 @@
-// 📌 Telegram Webhook Manager Bot (نسخه تمیز و آماده اجرا در Render)
+// 📌 Telegram Webhook Manager Bot (نسخه بهبود یافته با دکمه پایان عملیات و بازگشت به منوی اصلی)
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -28,26 +28,32 @@ app.post('/webhook', async (req, res) => {
 
             if (text === '/start') {
                 userStates[chatId] = { step: 'awaiting_bot_token' };
-                await sendMessage(chatId, `سلام ${userName} 🌷\nلطفاً Bot Token رباتی که می‌خواهید مدیریت کنید را ارسال کنید.`);
+                await sendMessage(chatId, `سلام ${userName} 🌷\nلطفاً Bot Token رباتی که می‌خواهید مدیریت کنید را ارسال کنید.`, mainKeyboard());
                 return res.sendStatus(200);
             }
 
             if (!userStates[chatId]) {
-                await sendMessage(chatId, `سلام ${userName} 🌷\nبرای شروع دستور /start را ارسال کنید.`);
+                await sendMessage(chatId, `سلام ${userName} 🌷\nبرای شروع دستور /start را ارسال کنید.`, mainKeyboard());
                 return res.sendStatus(200);
             }
 
             const userState = userStates[chatId];
 
+            if (text === '❌ پایان عملیات') {
+                delete userStates[chatId];
+                await sendMessage(chatId, '✅ داده‌های وارد شده شما پاکسازی شدند.\nبرای شروع مجدد /start را وارد کنید.', mainKeyboard());
+                return res.sendStatus(200);
+            }
+
             if (userState.step === 'awaiting_bot_token') {
                 userState.botToken = text.trim();
                 userState.step = 'awaiting_webhook_url';
-                await sendMessage(chatId, 'لطفاً Webhook URL خود را ارسال کنید:');
+                await sendMessage(chatId, 'لطفاً Webhook URL خود را ارسال کنید:', mainKeyboard());
             } else if (userState.step === 'awaiting_webhook_url') {
                 userState.webhookUrl = text.trim();
 
                 if (!userState.webhookUrl.startsWith('https://')) {
-                    await sendMessage(chatId, '❌ لینک وبهوک باید با https شروع شود. لطفاً یک لینک معتبر ارسال کنید.');
+                    await sendMessage(chatId, '❌ لینک وبهوک باید با https شروع شود. لطفاً یک لینک معتبر ارسال کنید.', mainKeyboard());
                     return res.sendStatus(200);
                 }
 
@@ -76,7 +82,7 @@ app.post('/webhook', async (req, res) => {
             const userState = userStates[chatId];
 
             if (!userState || !userState.botToken) {
-                await sendMessage(chatId, 'لطفاً ابتدا دستور /start را ارسال و اطلاعات لازم را وارد کنید.');
+                await sendMessage(chatId, 'لطفاً ابتدا دستور /start را ارسال و اطلاعات لازم را وارد کنید.', mainKeyboard());
                 return res.sendStatus(200);
             }
 
@@ -120,11 +126,9 @@ app.post('/webhook', async (req, res) => {
                 await answerCallbackQuery(update.callback_query.id);
                 await editMessageText(chatId, messageId, resultMessage);
 
-                delete userStates[chatId];
-
             } catch (error) {
                 const errorMessage = parseErrorToFarsi(error);
-                await sendMessage(chatId, errorMessage);
+                await sendMessage(chatId, errorMessage, mainKeyboard());
             }
         }
 
@@ -172,6 +176,15 @@ async function editMessageText(chatId, messageId, text) {
     } catch (error) {
         console.error('خطا در editMessageText:', error);
     }
+}
+
+// کیبورد اصلی با دکمه پایان عملیات
+function mainKeyboard() {
+    return {
+        keyboard: [[{ text: '❌ پایان عملیات' }]],
+        resize_keyboard: true,
+        one_time_keyboard: false
+    };
 }
 
 // تبدیل خطا به پیام فارسی
