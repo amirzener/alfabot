@@ -1,4 +1,4 @@
-// 📌 Telegram Webhook Manager Bot (نسخه بهینه‌شده و بدون خطا)
+// 📌 Telegram Webhook Manager Bot (نسخه تمیز و آماده اجرا در Render)
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 const userStates = {}; // { chatId: { step, botToken, webhookUrl } }
 
 // توکن ربات مدیریتی
-const MANAGER_BOT_TOKEN = '7953285191:AAGWGtE_pIRNaY-NYjAygsiYV0tzvYCCcQw';
+const MANAGER_BOT_TOKEN = process.env.MANAGER_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${MANAGER_BOT_TOKEN}`;
 
 // هندل وبهوک
@@ -45,6 +45,12 @@ app.post('/webhook', async (req, res) => {
                 await sendMessage(chatId, 'لطفاً Webhook URL خود را ارسال کنید:');
             } else if (userState.step === 'awaiting_webhook_url') {
                 userState.webhookUrl = text.trim();
+
+                if (!userState.webhookUrl.startsWith('https://')) {
+                    await sendMessage(chatId, '❌ لینک وبهوک باید با https شروع شود. لطفاً یک لینک معتبر ارسال کنید.');
+                    return res.sendStatus(200);
+                }
+
                 userState.step = 'ready';
 
                 const infoText = `✅ اطلاعات دریافت شد:\n\nBot Token: ${userState.botToken}\nWebhook URL: ${userState.webhookUrl}\n\nلطفاً انتخاب کنید چه عملیاتی انجام شود:`;
@@ -76,7 +82,6 @@ app.post('/webhook', async (req, res) => {
 
             const botToken = userState.botToken;
             const webhookUrl = userState.webhookUrl;
-
             let resultMessage = '';
 
             try {
@@ -87,25 +92,22 @@ app.post('/webhook', async (req, res) => {
                     const response = await axios.get(`https://api.telegram.org/bot${botToken}/deleteWebhook`);
                     resultMessage = `🗑️ وبهوک حذف شد:\n${JSON.stringify(response.data, null, 2)}`;
                 } else if (data === 'getWebhookInfo') {
-    const response = await axios.get(`https://api.telegram.org/bot${botToken}/getWebhookInfo`);
-    const info = response.data.result;
-
-    let formattedInfo = `ℹ️ *اطلاعات وبهوک:*\n`;
-    formattedInfo += `\n🌐 *URL:* ${info.url || 'تنظیم نشده'}`;
-    formattedInfo += `\n✅ *فعال:* ${info.has_custom_certificate ? 'بله' : 'خیر'}`;
-    formattedInfo += `\n🔒 *گواهی اختصاصی:* ${info.has_custom_certificate ? 'دارد' : 'ندارد'}`;
-    formattedInfo += `\n📥 *تعداد آپدیت‌های در انتظار:* ${info.pending_update_count}`;
-    if (info.last_error_date) {
-        const errorDate = new Date(info.last_error_date * 1000).toLocaleString('fa-IR');
-        formattedInfo += `\n⚠️ *آخرین خطا:* ${errorDate}\n📝 پیام: ${info.last_error_message}`;
-    }
-    if (info.ip_address) {
-        formattedInfo += `\n🖥️ *IP سرور:* ${info.ip_address}`;
-    }
-
-    resultMessage = formattedInfo;
-} 
-                } else if (data === 'getUpdatesCount')
+                    const response = await axios.get(`https://api.telegram.org/bot${botToken}/getWebhookInfo`);
+                    const info = response.data.result;
+                    let formattedInfo = `ℹ️ *اطلاعات وبهوک:*\n`;
+                    formattedInfo += `\n🌐 *URL:* ${info.url || 'تنظیم نشده'}`;
+                    formattedInfo += `\n✅ *فعال:* ${info.has_custom_certificate ? 'بله' : 'خیر'}`;
+                    formattedInfo += `\n🔒 *گواهی اختصاصی:* ${info.has_custom_certificate ? 'دارد' : 'ندارد'}`;
+                    formattedInfo += `\n📥 *تعداد آپدیت‌های در انتظار:* ${info.pending_update_count}`;
+                    if (info.last_error_date) {
+                        const errorDate = new Date(info.last_error_date * 1000).toLocaleString('fa-IR');
+                        formattedInfo += `\n⚠️ *آخرین خطا:* ${errorDate}\n📝 پیام: ${info.last_error_message}`;
+                    }
+                    if (info.ip_address) {
+                        formattedInfo += `\n🖥️ *IP سرور:* ${info.ip_address}`;
+                    }
+                    resultMessage = formattedInfo;
+                } else if (data === 'getUpdatesCount') {
                     const response = await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates`);
                     resultMessage = `📊 تعداد آپدیت‌های در انتظار: ${response.data.result.length}`;
                 } else if (data === 'deletePendingUpdates') {
@@ -117,6 +119,9 @@ app.post('/webhook', async (req, res) => {
 
                 await answerCallbackQuery(update.callback_query.id);
                 await editMessageText(chatId, messageId, resultMessage);
+
+                delete userStates[chatId];
+
             } catch (error) {
                 const errorMessage = parseErrorToFarsi(error);
                 await sendMessage(chatId, errorMessage);
@@ -161,8 +166,8 @@ async function editMessageText(chatId, messageId, text) {
         await axios.post(`${TELEGRAM_API}/editMessageText`, {
             chat_id: chatId,
             message_id: messageId,
-            text: text
-            parse_mode: 'Markdown',
+            text: text,
+            parse_mode: 'Markdown'
         });
     } catch (error) {
         console.error('خطا در editMessageText:', error);
