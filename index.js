@@ -104,8 +104,8 @@ app.post('/webhook', async (req, res) => {
     }
 
     resultMessage = formattedInfo;
-}
-                } else if (data === 'getUpdatesCount') {
+} 
+                } else if (data === 'getUpdatesCount')
                     const response = await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates`);
                     resultMessage = `📊 تعداد آپدیت‌های در انتظار: ${response.data.result.length}`;
                 } else if (data === 'deletePendingUpdates') {
