@@ -5,7 +5,7 @@ const axios = require('axios');
 const app = express();
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // وضعیت کاربران
 const userStates = {}; // { chatId: { step, botToken, webhookUrl } }
